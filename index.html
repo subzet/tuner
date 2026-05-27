@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="description" content="Guitar tuner - tune your guitar using your microphone" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>Guitar Tuner</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="app">
+    <h1 class="title">Guitar Tuner</h1>
+
+    <section class="needle-section">
+      <div class="needle-track">
+        <div class="needle-marks">
+          <span class="mark mark-left">♭</span>
+          <span class="mark mark-center">&#9679;</span>
+          <span class="mark mark-right">♯</span>
+        </div>
+        <div class="needle-container">
+          <div class="needle" id="needle"></div>
+        </div>
+      </div>
+      <div class="note-display" id="noteDisplay">—</div>
+      <div class="freq-display" id="freqDisplay"></div>
+      <div class="cents-display" id="centsDisplay"></div>
+    </section>
+
+    <section class="strings">
+      <div class="strings-label">Standard Tuning</div>
+      <div class="string-buttons" id="stringButtons">
+        <button class="string-btn" data-string="0" data-note="E2" data-freq="82.41">6 ⬡ E</button>
+        <button class="string-btn" data-string="1" data-note="A2" data-freq="110.00">5 ⬡ A</button>
+        <button class="string-btn" data-string="2" data-note="D3" data-freq="146.83">4 ⬡ D</button>
+        <button class="string-btn" data-string="3" data-note="G3" data-freq="196.00">3 ⬡ G</button>
+        <button class="string-btn" data-string="4" data-note="B3" data-freq="246.94">2 ⬡ B</button>
+        <button class="string-btn" data-string="5" data-note="E4" data-freq="329.63">1 ⬡ e</button>
+      </div>
+    </section>
+
+    <section class="controls">
+      <button class="mic-btn" id="micBtn" aria-label="Toggle microphone">
+        <span class="mic-icon" id="micIcon">🎤</span>
+        <span id="micText">Start</span>
+      </button>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

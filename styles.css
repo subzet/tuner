@@ -1,0 +1,239 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --accent: #e94560;
+  --text: #eee;
+  --text-dim: #999;
+  --green: #00cc66;
+  --green-dim: #0a3d1a;
+  --orange: #ff9900;
+  --orange-dim: #4a2e00;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  gap: 32px;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- NEEDLE / METER ---- */
+.needle-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.needle-track {
+  width: 100%;
+  height: 48px;
+  background: var(--surface);
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.needle-marks {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 0 16px;
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  position: relative;
+  z-index: 1;
+}
+
+.mark-center {
+  color: var(--green);
+}
+
+.needle-container {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 100%;
+  z-index: 2;
+}
+
+.needle {
+  width: 2px;
+  height: 100%;
+  background: var(--accent);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: left 0.1s ease-out;
+  border-radius: 1px;
+}
+
+.needle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.note-display {
+  font-size: 3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.freq-display {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.cents-display {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  height: 1.2em;
+}
+
+/* ---- STRING BUTTONS ---- */
+.strings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.strings-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.string-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.string-btn {
+  padding: 12px 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.string-btn.active {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.string-btn.tuned {
+  border-color: var(--green);
+  background: var(--green-dim);
+}
+
+/* ---- MIC BUTTON ---- */
+.controls {
+  display: flex;
+  gap: 12px;
+}
+
+.mic-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.mic-btn:active {
+  transform: scale(0.96);
+}
+
+.mic-btn.listening {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.mic-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- State helpers ---- */
+.tuned-bg {
+  background: var(--green-dim) !important;
+}
+
+.flat-bg {
+  background: var(--orange-dim) !important;
+}
+
+.note-in-tune {
+  color: var(--green);
+}
+
+.note-sharp {
+  color: var(--orange);
+}
+
+.note-flat {
+  color: var(--orange);
+}
+
+/* ---- Responsive ---- */
+@media (min-width: 480px) {
+  .note-display { font-size: 4rem; }
+  .string-btn { padding: 14px 8px; font-size: 1rem; }
+}
