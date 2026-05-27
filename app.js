@@ -1,10 +1,10 @@
 const STRINGS = [
-  { note: 'E2', freq: 82.41 },
-  { note: 'A2', freq: 110.00 },
-  { note: 'D3', freq: 146.83 },
-  { note: 'G3', freq: 196.00 },
-  { note: 'B3', freq: 246.94 },
-  { note: 'E4', freq: 329.63 },
+  { note: 'E2', freq: 82.41, label: '6 E' },
+  { note: 'A2', freq: 110.00, label: '5 A' },
+  { note: 'D3', freq: 146.83, label: '4 D' },
+  { note: 'G3', freq: 196.00, label: '3 G' },
+  { note: 'B3', freq: 246.94, label: '2 B' },
+  { note: 'E4', freq: 329.63, label: '1 e' },
 ];
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -16,20 +16,37 @@ let micStream = null;
 let animationId = null;
 let isListening = false;
 
-let selectedString = 0;
-let history = [];
+let freqHistory = [];
+const MAX_HISTORY = 8;
+let silenceFrames = 0;
+const SILENCE_TIMEOUT = 15;
 
 const micBtn = document.getElementById('micBtn');
 const micIcon = document.getElementById('micIcon');
 const micText = document.getElementById('micText');
 const needle = document.getElementById('needle');
+const needleTrack = document.querySelector('.needle-track');
 const noteDisplay = document.getElementById('noteDisplay');
 const freqDisplay = document.getElementById('freqDisplay');
 const centsDisplay = document.getElementById('centsDisplay');
+const stringButtons = document.getElementById('stringButtons');
+
+function buildStringButtons() {
+  stringButtons.innerHTML = '';
+  STRINGS.forEach((s, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'string-btn';
+    btn.dataset.index = i;
+    btn.dataset.note = s.note;
+    btn.dataset.freq = s.freq;
+    btn.textContent = s.label;
+    stringButtons.appendChild(btn);
+  });
+}
+buildStringButtons();
 
 function freqToNote(freq) {
-  const n = 12 * Math.log2(freq / A4) + 69;
-  return Math.round(n);
+  return Math.round(12 * Math.log2(freq / A4) + 69);
 }
 
 function noteName(midi) {
@@ -41,70 +58,63 @@ function centsOff(freq, midi) {
   return 1200 * Math.log2(freq / expected);
 }
 
+function findClosestString(freq) {
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < STRINGS.length; i++) {
+    const dist = Math.abs(freq - STRINGS[i].freq);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
 function autocorrelate(buf, sampleRate) {
   const SIZE = buf.length;
-  const rms = Math.sqrt(buf.reduce((s, v) => s + v * v, 0) / SIZE);
-  if (rms < 0.01) return -1;
 
-  const threshold = 0.2 * rms;
-  let zeroCrossings = 0;
-  for (let i = 1; i < SIZE; i++) {
-    if (buf[i - 1] < 0 && buf[i] >= 0) zeroCrossings++;
-  }
-  if (zeroCrossings < 3) return -1;
+  let sumSq = 0;
+  for (let i = 0; i < SIZE; i++) sumSq += buf[i] * buf[i];
+  const rms = Math.sqrt(sumSq / SIZE);
+  if (rms < 0.0025) return -1;
 
-  const maxOffset = Math.min(SIZE, Math.floor(sampleRate / 60));
+  const minLag = Math.floor(sampleRate / 500);
+  const maxLag = Math.floor(sampleRate / 70);
+
   let bestOffset = -1;
   let bestCorrelation = 0;
-  let found = false;
 
-  for (let offset = Math.floor(sampleRate / 1200); offset < maxOffset; offset++) {
+  for (let offset = minLag; offset < maxLag; offset++) {
     let correlation = 0;
     for (let i = 0; i < SIZE - offset; i++) {
       correlation += buf[i] * buf[i + offset];
     }
     correlation /= (SIZE - offset);
+
     if (correlation > bestCorrelation) {
       bestCorrelation = correlation;
       bestOffset = offset;
-      found = true;
     }
   }
 
-  if (!found) return -1;
+  if (bestOffset < 0) return -1;
 
-  const peakThreshold = 0.9 * bestCorrelation;
-  let refinedOffset = bestOffset;
-  let refined = false;
-  for (let offset = Math.max(1, bestOffset - 10); offset < Math.min(maxOffset, bestOffset + 10); offset++) {
-    if (offset >= maxOffset) continue;
-    let correlation = 0;
-    for (let i = 0; i < SIZE - offset; i++) {
-      correlation += buf[i] * buf[i + offset];
-    }
-    correlation /= (SIZE - offset);
-    if (correlation > peakThreshold) {
-      refinedOffset = offset;
-      refined = true;
-    }
-  }
-  if (refined) bestOffset = refinedOffset;
+  const signalRatio = bestCorrelation / (sumSq / SIZE + 1e-10);
+  if (signalRatio < 0.15) return -1;
 
   return sampleRate / bestOffset;
 }
 
-function parabolicInterpolation(buf, peakIndex) {
-  const left = buf[peakIndex - 1] || 0;
-  const center = buf[peakIndex];
-  const right = buf[peakIndex + 1] || 0;
-  const denom = left - 2 * center + right;
-  if (denom === 0) return 0;
-  return (left - right) / (2 * denom);
-}
-
 async function startMic() {
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 4096;
@@ -117,7 +127,7 @@ async function startMic() {
   } catch (err) {
     console.error(err);
     micIcon.textContent = '⚠️';
-    micText.textContent = 'No mic access';
+    micText.textContent = 'No mic';
     micBtn.disabled = true;
   }
 }
@@ -135,10 +145,21 @@ function stopMic() {
   }
   analyser = null;
   updateMicUI();
+  resetUI();
+}
+
+function resetUI() {
   needle.style.left = '50%';
+  needle.style.opacity = '1';
+  needleTrack.classList.remove('tuned');
   noteDisplay.textContent = '—';
+  noteDisplay.className = 'note-display';
   freqDisplay.textContent = '';
   centsDisplay.textContent = '';
+  centsDisplay.className = 'cents-display';
+  document.querySelectorAll('.string-btn').forEach(b => {
+    b.classList.remove('active', 'tuned');
+  });
 }
 
 function updateMicUI() {
@@ -161,64 +182,76 @@ function tick() {
 
   const freq = autocorrelate(buffer, audioCtx.sampleRate);
 
-  if (freq > 0) {
-    history.push(freq);
-    if (history.length > 3) history.shift();
-    const smoothedFreq = history.reduce((a, b) => a + b, 0) / history.length;
+  if (freq > 0 && freq >= 60 && freq <= 400) {
+    freqHistory.push(freq);
+    if (freqHistory.length > MAX_HISTORY) freqHistory.shift();
+    silenceFrames = 0;
+
+    const sorted = [...freqHistory].sort((a, b) => a - b);
+    const trimmed = sorted.slice(1, -1);
+    const smoothedFreq = trimmed.length > 0
+      ? trimmed.reduce((a, b) => a + b, 0) / trimmed.length
+      : freq;
 
     const midi = freqToNote(smoothedFreq);
     const name = noteName(midi);
     const cents = centsOff(smoothedFreq, midi);
 
+    const closestIdx = findClosestString(smoothedFreq);
+    const targetFreq = STRINGS[closestIdx].freq;
+    const targetCents = 1200 * Math.log2(smoothedFreq / targetFreq);
+
     noteDisplay.textContent = name;
     freqDisplay.textContent = smoothedFreq.toFixed(1) + ' Hz';
-    const absCents = Math.abs(cents);
 
-    if (absCents < 5) {
-      centsDisplay.textContent = 'In tune ✓';
-      centsDisplay.style.color = 'var(--green)';
-      noteDisplay.style.color = 'var(--green)';
-    } else if (absCents < 15) {
-      centsDisplay.textContent = (cents > 0 ? '+' : '') + cents.toFixed(0) + ' cents';
-      centsDisplay.style.color = 'var(--orange)';
-      noteDisplay.style.color = 'var(--orange)';
+    const absCents = Math.abs(targetCents);
+
+    if (absCents < 3) {
+      centsDisplay.textContent = '✓ In tune';
+      centsDisplay.className = 'cents-display in-tune';
+      noteDisplay.className = 'note-display in-tune';
+      needleTrack.classList.add('tuned');
+      needle.style.opacity = '1';
     } else {
-      centsDisplay.textContent = (cents > 0 ? '+' : '') + cents.toFixed(0) + ' cents';
-      centsDisplay.style.color = 'var(--orange)';
-      noteDisplay.style.color = 'var(--orange)';
+      const dir = targetCents > 0 ? '▲ Tune down' : '▼ Tune up';
+      centsDisplay.textContent = dir + ' · ' + absCents.toFixed(0) + '¢';
+      centsDisplay.className = 'cents-display';
+      noteDisplay.className = 'note-display';
+      needleTrack.classList.remove('tuned');
+      needle.style.opacity = '1';
     }
 
-    const clamped = Math.max(-50, Math.min(50, cents));
+    const clamped = Math.max(-50, Math.min(50, targetCents));
     const pct = 50 + clamped;
     needle.style.left = pct + '%';
 
-    updateStringHighlight(name);
+    highlightString(closestIdx, absCents < 3);
   } else {
-    noteDisplay.textContent = '…';
-    freqDisplay.textContent = '';
-    centsDisplay.textContent = '';
-    noteDisplay.style.color = 'var(--text)';
+    silenceFrames++;
+    if (silenceFrames > SILENCE_TIMEOUT) {
+      freqHistory = [];
+      needle.style.left = '50%';
+      needle.style.opacity = '0.3';
+      needleTrack.classList.remove('tuned');
+      noteDisplay.textContent = '—';
+      noteDisplay.className = 'note-display';
+      freqDisplay.textContent = '';
+      centsDisplay.textContent = '';
+      centsDisplay.className = 'cents-display';
+      document.querySelectorAll('.string-btn').forEach(b => {
+        b.classList.remove('active', 'tuned');
+      });
+    }
   }
 
   animationId = requestAnimationFrame(tick);
 }
 
-function updateStringHighlight(detectedNote) {
-  const target = STRINGS[selectedString];
-  const match = detectedNote === target.note || detectedNote === noteName(freqToNote(target.freq));
-
+function highlightString(index, tuned) {
   document.querySelectorAll('.string-btn').forEach(btn => {
-    const idx = parseInt(btn.dataset.string);
-    if (idx === selectedString) {
-      btn.classList.add('active');
-      if (match && noteDisplay.style.color === 'var(--green)') {
-        btn.classList.add('tuned');
-      } else {
-        btn.classList.remove('tuned');
-      }
-    } else {
-      btn.classList.remove('active');
-    }
+    const i = parseInt(btn.dataset.index);
+    btn.classList.toggle('active', i === index);
+    btn.classList.toggle('tuned', i === index && tuned);
   });
 }
 
@@ -226,25 +259,10 @@ micBtn.addEventListener('click', () => {
   if (isListening) {
     stopMic();
   } else {
-    history = [];
+    freqHistory = [];
+    silenceFrames = 0;
     startMic();
   }
-});
-
-function selectString(index) {
-  selectedString = index;
-  history = [];
-  document.querySelectorAll('.string-btn').forEach(btn => {
-    const idx = parseInt(btn.dataset.string);
-    btn.classList.toggle('active', idx === index);
-    btn.classList.remove('tuned');
-  });
-}
-
-document.getElementById('stringButtons').addEventListener('click', (e) => {
-  const btn = e.target.closest('.string-btn');
-  if (!btn) return;
-  selectString(parseInt(btn.dataset.string));
 });
 
 if ('serviceWorker' in navigator) {

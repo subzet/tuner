@@ -11,6 +11,7 @@
   --text: #eee;
   --text-dim: #999;
   --green: #00cc66;
+  --green-glow: rgba(0, 204, 102, 0.3);
   --green-dim: #0a3d1a;
   --orange: #ff9900;
   --orange-dim: #4a2e00;
@@ -60,6 +61,12 @@ html, body {
   border-radius: 24px;
   position: relative;
   overflow: hidden;
+  transition: box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.needle-track.tuned {
+  background: var(--green-dim);
+  box-shadow: 0 0 20px var(--green-glow), inset 0 0 20px var(--green-glow);
 }
 
 .needle-marks {
@@ -95,7 +102,7 @@ html, body {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  transition: left 0.1s ease-out;
+  transition: left 0.08s ease-out, opacity 0.3s;
   border-radius: 1px;
 }
 
@@ -105,16 +112,26 @@ html, body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
-  background: var(--accent);
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.tuned .needle, .tuned .needle::after {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
 }
 
 .note-display {
   font-size: 3rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  transition: color 0.2s;
+}
+
+.note-display.in-tune {
+  color: var(--green);
 }
 
 .freq-display {
@@ -128,6 +145,32 @@ html, body {
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
   height: 1.2em;
+  transition: color 0.2s;
+}
+
+.cents-display.in-tune {
+  color: var(--green);
+}
+
+/* ---- DIRECTION HINTS ---- */
+.direction-left {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  z-index: 1;
+}
+
+.direction-right {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  z-index: 1;
 }
 
 /* ---- STRING BUTTONS ---- */
@@ -163,7 +206,7 @@ html, body {
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .string-btn.active {
@@ -174,6 +217,7 @@ html, body {
 .string-btn.tuned {
   border-color: var(--green);
   background: var(--green-dim);
+  box-shadow: 0 0 12px var(--green-glow);
 }
 
 /* ---- MIC BUTTON ---- */
@@ -209,27 +253,6 @@ html, body {
 .mic-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-/* ---- State helpers ---- */
-.tuned-bg {
-  background: var(--green-dim) !important;
-}
-
-.flat-bg {
-  background: var(--orange-dim) !important;
-}
-
-.note-in-tune {
-  color: var(--green);
-}
-
-.note-sharp {
-  color: var(--orange);
-}
-
-.note-flat {
-  color: var(--orange);
 }
 
 /* ---- Responsive ---- */
