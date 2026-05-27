@@ -124,18 +124,18 @@ function autocorrelate(buf, sampleRate) {
 
   const freq = sampleRate / bestOffset;
 
-  if (freq < 80) return freq;
+  if (freq >= 80) {
+    const halfLag = Math.round(bestOffset / 2);
+    if (halfLag >= minLag && halfLag < maxLag) {
+      let halfCorr = 0;
+      for (let i = 0; i < SIZE - halfLag; i++) {
+        halfCorr += buf[i] * buf[i + halfLag];
+      }
+      halfCorr /= (SIZE - halfLag);
 
-  const halfLag = Math.round(bestOffset / 2);
-  if (halfLag >= minLag && halfLag < maxLag) {
-    let halfCorr = 0;
-    for (let i = 0; i < SIZE - halfLag; i++) {
-      halfCorr += buf[i] * buf[i + halfLag];
-    }
-    halfCorr /= (SIZE - halfLag);
-
-    if (halfCorr > bestCorrelation * 0.55) {
-      return freq * 2;
+      if (halfCorr > bestCorrelation * 0.55) {
+        return freq * 2;
+      }
     }
   }
 
@@ -143,7 +143,7 @@ function autocorrelate(buf, sampleRate) {
 }
 
 function resolveOctave(acFreq, fftFreq) {
-  if (fftFreq <= 0) return acFreq;
+  if (fftFreq <= 0 || acFreq < 130) return acFreq;
 
   let best = acFreq;
   let bestDist = Math.abs(acFreq - fftFreq);
