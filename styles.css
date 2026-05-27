@@ -255,6 +255,45 @@ html, body {
   cursor: not-allowed;
 }
 
+/* ---- HOW TO ---- */
+.howto {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 8px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: 12px;
+}
+
+.howto h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.howto ol {
+  list-style-position: inside;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.howto li {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.howto li strong {
+  color: var(--text);
+}
+
+.green-dot {
+  color: var(--green);
+}
+
 /* ---- Responsive ---- */
 @media (min-width: 480px) {
   .note-display { font-size: 4rem; }
