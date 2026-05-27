@@ -53,11 +53,6 @@ function noteName(midi) {
   return NOTE_NAMES[midi % 12] + Math.floor(midi / 12 - 1);
 }
 
-function centsOff(freq, midi) {
-  const expected = A4 * Math.pow(2, (midi - 69) / 12);
-  return 1200 * Math.log2(freq / expected);
-}
-
 function findClosestString(freq) {
   let best = 0;
   let bestDist = Infinity;
@@ -69,6 +64,30 @@ function findClosestString(freq) {
     }
   }
   return best;
+}
+
+function fftPeak(fftData, sampleRate, fftSize) {
+  const binWidth = sampleRate / fftSize;
+  let bestBin = -1;
+  let bestMag = -Infinity;
+
+  const loBin = Math.floor(60 / binWidth);
+  const hiBin = Math.floor(450 / binWidth);
+
+  for (let i = loBin; i <= hiBin; i++) {
+    if (fftData[i] > bestMag) {
+      bestMag = fftData[i];
+      bestBin = i;
+    }
+  }
+
+  if (bestBin < 0) return -1;
+
+  const left = fftData[bestBin - 1] || fftData[bestBin];
+  const center = fftData[bestBin];
+  const right = fftData[bestBin + 1] || fftData[bestBin];
+  const delta = (left - right) / (2 * (left - 2 * center + right) + 1e-10);
+  return (bestBin + delta) * binWidth;
 }
 
 function autocorrelate(buf, sampleRate) {
@@ -103,7 +122,42 @@ function autocorrelate(buf, sampleRate) {
   const signalRatio = bestCorrelation / (sumSq / SIZE + 1e-10);
   if (signalRatio < 0.15) return -1;
 
-  return sampleRate / bestOffset;
+  const freq = sampleRate / bestOffset;
+
+  if (freq < 80) return freq;
+
+  const halfLag = Math.round(bestOffset / 2);
+  if (halfLag >= minLag && halfLag < maxLag) {
+    let halfCorr = 0;
+    for (let i = 0; i < SIZE - halfLag; i++) {
+      halfCorr += buf[i] * buf[i + halfLag];
+    }
+    halfCorr /= (SIZE - halfLag);
+
+    if (halfCorr > bestCorrelation * 0.55) {
+      return freq * 2;
+    }
+  }
+
+  return freq;
+}
+
+function resolveOctave(acFreq, fftFreq) {
+  if (fftFreq <= 0) return acFreq;
+
+  let best = acFreq;
+  let bestDist = Math.abs(acFreq - fftFreq);
+
+  const candidates = [acFreq * 0.5, acFreq, acFreq * 2];
+  for (const c of candidates) {
+    if (c < 70 || c > 400) continue;
+    const d = Math.abs(c - fftFreq);
+    if (d < bestDist) {
+      bestDist = d;
+      best = c;
+    }
+  }
+  return best;
 }
 
 async function startMic() {
@@ -177,13 +231,32 @@ function updateMicUI() {
 function tick() {
   if (!isListening) return;
 
-  const buffer = new Float32Array(analyser.fftSize);
-  analyser.getFloatTimeDomainData(buffer);
+  const timeData = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(timeData);
 
-  const freq = autocorrelate(buffer, audioCtx.sampleRate);
+  const freqData = new Float32Array(analyser.frequencyBinCount);
+  analyser.getFloatFrequencyData(freqData);
 
-  if (freq > 0 && freq >= 60 && freq <= 400) {
-    freqHistory.push(freq);
+  const linearMag = new Float32Array(freqData.length);
+  let maxMag = -Infinity;
+  for (let i = 0; i < freqData.length; i++) {
+    linearMag[i] = Math.pow(10, freqData[i] / 20);
+    if (linearMag[i] > maxMag) maxMag = linearMag[i];
+  }
+
+  const noiseFloor = maxMag * 0.08;
+
+  const acFreq = autocorrelate(timeData, audioCtx.sampleRate);
+
+  const fftFreq = maxMag > 0.0002 ? fftPeak(linearMag, audioCtx.sampleRate, analyser.fftSize) : -1;
+
+  let rawFreq = acFreq;
+  if (acFreq > 0) {
+    rawFreq = resolveOctave(acFreq, fftFreq);
+  }
+
+  if (rawFreq > 0 && rawFreq >= 60 && rawFreq <= 400) {
+    freqHistory.push(rawFreq);
     if (freqHistory.length > MAX_HISTORY) freqHistory.shift();
     silenceFrames = 0;
 
@@ -191,15 +264,14 @@ function tick() {
     const trimmed = sorted.slice(1, -1);
     const smoothedFreq = trimmed.length > 0
       ? trimmed.reduce((a, b) => a + b, 0) / trimmed.length
-      : freq;
-
-    const midi = freqToNote(smoothedFreq);
-    const name = noteName(midi);
-    const cents = centsOff(smoothedFreq, midi);
+      : rawFreq;
 
     const closestIdx = findClosestString(smoothedFreq);
     const targetFreq = STRINGS[closestIdx].freq;
     const targetCents = 1200 * Math.log2(smoothedFreq / targetFreq);
+
+    const midi = freqToNote(smoothedFreq);
+    const name = noteName(midi);
 
     noteDisplay.textContent = name;
     freqDisplay.textContent = smoothedFreq.toFixed(1) + ' Hz';
